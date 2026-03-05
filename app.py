@@ -164,7 +164,7 @@ if uploaded_file is not None:
                     tmp_path = tmp_file.name
 
                 # 6. 음성 파일 업로드 (Gemini 서버로 전달 시 한글 이름 에러를 방지하기 위해 display_name 지정)
-                audio_file = genai.upload_file(path=tmp_path, display_name="uploaded_audio_file")
+                audio_file = audio_file = genai.upload_file(path=tmp_path, display_name="uploaded_audio_file")
                 
                 # 7. 프롬프트 설정 (여기서 'prompt'를 확실히 정의합니다!)
                 if format_selection == "양식 1: 상세 개발 회의록":
