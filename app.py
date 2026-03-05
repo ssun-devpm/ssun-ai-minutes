@@ -31,21 +31,16 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("**ℹ️ 앱 정보**")
 st.sidebar.caption("- **제작자:** ssun@madngine.com\n- **개발 지원 -노선영\n- **버전:** v1.1.0")
 
-# 2. 기본/사용자 API 키 설정 및 환경 구성
-try:
-    # API 키처럼 보이는 문자열인지 대략적인 정규식 검사 또는 길이 검사
-    if user_api_key and len(user_api_key.strip()) < 100 and user_api_key.startswith("AIza"):
-        # 사용자가 올바른 형태의 키를 입력했을 경우
-        genai.configure(api_key=user_api_key.strip())
-        st.sidebar.success("✅ 사용자 API 키 적용 완료")
-    else:
-        # 내역이 없거나(비어있음) 잘못된 문자열을 복붙한 경우 기본 키로 롤백
-        if user_api_key:
-            st.sidebar.warning("⚠️ 입력하신 값이 올바른 구글 API 키 형식이 아닌 것 같습니다. (AIza로 시작해야 합니다.)\n기본 내장 키로 전환합니다.")
-        MY_KEY = "AIzaSyA-nTcfCLLqneoN5F0LsZwZHACWnwKM7pY"
-        genai.configure(api_key=MY_KEY)
-except Exception as e:
-    st.error(f"API 키 설정 오류: {e}")
+# 2. API 키 적용 확인 및 경고 메시지
+has_valid_key = False
+if user_api_key and len(user_api_key.strip()) > 10 and user_api_key.startswith("AIza"):
+    genai.configure(api_key=user_api_key.strip())
+    st.sidebar.success("✅ API 키 적용 완료")
+    has_valid_key = True
+else:
+    st.sidebar.error("❌ 유효한 구글 Gemini API 키를 입력해주세요. (AIza... 로 시작)")
+    st.warning("⚠️ **필독:** 이전에 내장되어 있던 공용 API 키가 구글 보안 정책에 의해 노출(Leaked) 처리되어 차단되었습니다. 이제부터는 왼쪽 사이드바에 **반드시 본인의 API 키를 직접 발급받아 입력하셔야** 회의록이 생성됩니다.")
+    st.info("💡 [구글 AI Studio](https://aistudio.google.com/app/apikey)에서 무료로 API 키를 즉시 발급받을 수 있습니다.")
 
 # 3. 모델 설정
 try:
@@ -108,6 +103,10 @@ if uploaded_file is not None:
                 selected_model_name = 'gemini-2.5-flash-lite' 
 
     if button_clicked:
+        if not has_valid_key:
+            st.error("❌ 왼쪽 사이드바에 유효한 API 키를 먼저 입력해주세요.")
+            st.stop()
+            
         import time
         import threading
         
@@ -164,7 +163,7 @@ if uploaded_file is not None:
                     tmp_path = tmp_file.name
 
                 # 6. 음성 파일 업로드 (Gemini 서버로 전달 시 한글 이름 에러를 방지하기 위해 display_name 지정)
-                audio_file = audio_file = genai.upload_file(path=tmp_path, display_name="uploaded_audio_file")
+                audio_file = genai.upload_file(path=tmp_path, mime_type="audio/mpeg")
                 
                 # 7. 프롬프트 설정 (여기서 'prompt'를 확실히 정의합니다!)
                 if format_selection == "양식 1: 상세 개발 회의록":
@@ -275,7 +274,14 @@ if uploaded_file is not None:
             # 429 Quota 에러가 발생할 경우를 위한 안내 (주로 Pro 모델 무료 한도 초과 시 발생)
             if "429" in error_msg or "Quota exceeded" in error_msg:
                 st.error("❌ 선택하신 AI 모델의 무료 제공량(Quota)을 초과했습니다.")
-                st.info("💡 **해결 방법:** 당분간은 **'초절전(Lite) 🍃' 버튼**을 사용하시거나, 왼쪽 사이드바에 본인의 구글 API 키를 발급받아 등록해 보세요.")
+                st.info("💡 **해결 방법:** 당분간은 **'초절전(Lite) 🍃' 버튼**을 사용하시거나, 왼쪽 사이드바에 등록한 구글 API 키의 한도를 확인해 보세요.")
+            # 403 API 키 노출 에러 (Leaked) 대응
+            elif "403" in error_msg or "leaked" in error_msg.lower():
+                st.error("❌ 입력하신 API 키가 Google에 의해 외부에 노출(Leaked)되어 차단되었습니다.")
+                st.info("💡 **해결 방법:** [구글 AI Studio](https://aistudio.google.com/app/apikey)에 접속해서 기존 키를 삭제하시고, **새로운 API 키를 발급**받아 다시 사이드바에 입력해 보세요.")
+            # 400 잘못된 키 에러 대응
+            elif "400" in error_msg or "API key not valid" in error_msg:
+                st.error("❌ 유효하지 않은 API 키입니다.")
             # 404 에러가 다시 발생할 경우를 위한 안내
             elif "404" in error_msg:
                 st.error("오류가 발생했습니다 (404).")
