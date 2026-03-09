@@ -64,11 +64,21 @@ with tab1:
 
 with tab2:
     st.write("마이크 아이콘을 누르면 녹음이 시작되고, 다시 누르면 중지됩니다.")
-    audio_bytes = audio_recorder(text="클릭하여 녹음 (시작/중지)", recording_color="#e8b62c", neutral_color="#6aa36f")
+    # 녹음 중지 상태는 회색, 녹음 중 상태는 빨간색으로 변경하여 가시성 확보
+    audio_bytes = audio_recorder(text="클릭하여 녹음 (시작/중지)", recording_color="#ff4b4b", neutral_color="#808080", icon_size="2x")
     if audio_bytes:
+        file_name = f"recorded_audio_{datetime.datetime.now().strftime('%H%M%S')}.wav"
+        st.success("✅ 녹음이 완료되었습니다!")
         st.audio(audio_bytes, format="audio/wav")
+        # 녹음 완료 후 오디오 원본 다운로드 버튼 제공
+        st.download_button(
+            label="📥 녹음 파일 다운로드",
+            data=audio_bytes,
+            file_name=file_name,
+            mime="audio/wav"
+        )
         # 바이너리 바이트 데이터를 전달
-        audio_data_to_process = {"type": "record", "data": audio_bytes, "ext": "wav", "name": f"recorded_audio_{datetime.datetime.now().strftime('%H%M%S')}.wav"}
+        audio_data_to_process = {"type": "record", "data": audio_bytes, "ext": "wav", "name": file_name}
 
 if audio_data_to_process is not None:
     # 모델 선택 및 생성 버튼 (양식에 따라 동적 렌더링)
