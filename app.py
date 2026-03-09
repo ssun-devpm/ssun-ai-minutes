@@ -1,9 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
-from google.generativeai.types import RequestOptions # 이 줄을 추가합니다.
+from google.generativeai.types import RequestOptions
 import tempfile
 import os
 import datetime
+from audio_recorder_streamlit import audio_recorder
 
 st.set_page_config(page_title="회의록 생성봇 노썬", layout="wide")
 st.title("🎤 끝내주는 노썬 회의록 작성 봇")
@@ -49,12 +50,27 @@ try:
 except Exception as e:
     st.error(f"모델 설정 오류: {e}")
 
-# 4. 파일 업로드
-uploaded_file = st.file_uploader("회의 음성 파일 업로드 (mp3, wav, m4a)", type=['mp3', 'wav', 'm4a'])
+# 4. 파일 업로드 및 음성 녹음 UI (탭으로 분리)
+tab1, tab2 = st.tabs(["📂 파일 업로드", "🎙️ 직접 녹음"])
 
-if uploaded_file is not None:
-    st.audio(uploaded_file)
-    
+audio_data_to_process = None # [업로드된 객체 또는 바이너리 오디오, 확장자 포맷 이름] 을 담을 변수
+
+with tab1:
+    uploaded_file = st.file_uploader("회의 음성 파일 업로드 (mp3, wav, m4a)", type=['mp3', 'wav', 'm4a'])
+    if uploaded_file is not None:
+        st.audio(uploaded_file)
+        # 업로드된 파일의 형태 그대로 전달
+        audio_data_to_process = {"type": "upload", "data": uploaded_file, "ext": uploaded_file.name.split('.')[-1], "name": uploaded_file.name}
+
+with tab2:
+    st.write("마이크 아이콘을 누르면 녹음이 시작되고, 다시 누르면 중지됩니다.")
+    audio_bytes = audio_recorder(text="클릭하여 녹음 (시작/중지)", recording_color="#e8b62c", neutral_color="#6aa36f")
+    if audio_bytes:
+        st.audio(audio_bytes, format="audio/wav")
+        # 바이너리 바이트 데이터를 전달
+        audio_data_to_process = {"type": "record", "data": audio_bytes, "ext": "wav", "name": f"recorded_audio_{datetime.datetime.now().strftime('%H%M%S')}.wav"}
+
+if audio_data_to_process is not None:
     # 모델 선택 및 생성 버튼 (양식에 따라 동적 렌더링)
     button_clicked = False
     selected_model_name = ""
@@ -157,13 +173,16 @@ if uploaded_file is not None:
                     generation_config={"temperature": 0.2} # 0에 가까울수록 매번 일정한 결과 출력
                 )
                 
-                # 5. 임시 파일 저장
-                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp_file:
-                    tmp_file.write(uploaded_file.getvalue())
+                # 5. 임시 파일 저장 (오디오 메타데이터를 바이너리로 쓰기)
+                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{audio_data_to_process['ext']}", mode="w+b") as tmp_file:
+                    if audio_data_to_process["type"] == "upload":
+                        tmp_file.write(audio_data_to_process["data"].getvalue())
+                    else: # type == "record"
+                        tmp_file.write(audio_data_to_process["data"])
                     tmp_path = tmp_file.name
 
                 # 6. 음성 파일 업로드 (Gemini 서버로 전달 시 한글 이름 에러를 방지하기 위해 display_name 지정)
-                audio_file = genai.upload_file(path=tmp_path, mime_type="audio/mpeg")
+                audio_file = genai.upload_file(path=tmp_path, mime_type="audio/webm" if audio_data_to_process["ext"] == "wav" else "audio/mpeg")
                 
                 # 7. 프롬프트 설정 (여기서 'prompt'를 확실히 정의합니다!)
                 if format_selection == "양식 1: 상세 개발 회의록":
@@ -257,7 +276,7 @@ if uploaded_file is not None:
                 # 9. 세션 상태에 생성된 회의록 추가
                 now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.session_state.meeting_minutes.append({
-                    "original_name": uploaded_file.name,
+                    "original_name": audio_data_to_process["name"],
                     "model": selected_model_name,
                     "format": format_selection,
                     "text": response.text,
