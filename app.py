@@ -65,7 +65,15 @@ with tab1:
 with tab2:
     st.write("마이크 아이콘을 누르면 녹음이 시작되고, 다시 누르면 중지됩니다.")
     # 녹음 중지 상태는 회색, 녹음 중 상태는 빨간색으로 변경하여 가시성 확보
-    audio_bytes = audio_recorder(text="클릭하여 녹음 (시작/중지)", recording_color="#ff4b4b", neutral_color="#808080", icon_size="2x")
+    # Safari 모바일 버그 해결: pause_threshold를 600초(10분)로 늘려서 침묵 시 강제 종료되는 것 방지
+    audio_bytes = audio_recorder(
+        text="클릭하여 녹음 (시작/중지)", 
+        recording_color="#ff4b4b", 
+        neutral_color="#808080", 
+        icon_size="2x",
+        pause_threshold=600.0,
+        sample_rate=44100
+    )
     if audio_bytes:
         file_name = f"recorded_audio_{datetime.datetime.now().strftime('%H%M%S')}.wav"
         st.success("✅ 녹음이 완료되었습니다!")
