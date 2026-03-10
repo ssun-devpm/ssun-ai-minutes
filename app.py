@@ -64,15 +64,14 @@ with tab1:
 
 with tab2:
     st.write("마이크 아이콘을 누르면 녹음이 시작되고, 다시 누르면 중지됩니다.")
+    st.info("⚠️ **참고:** PC에 마이크가 아예 연결되어 있지 않거나 브라우저 권한이 차단된 경우, 브라우저 보안 정책상 녹음 자체가 시작되지 않아 아무런 반응이 없거나 빈 파일조차 생성되지 않습니다.")
     # 녹음 중지 상태는 회색, 녹음 중 상태는 빨간색으로 변경하여 가시성 확보
-    # Safari 모바일 버그 해결: pause_threshold를 600초(10분)로 늘려서 침묵 시 강제 종료되는 것 방지
+    # 오직 색상 파라미터만 남기고 크롬 호환성을 위해 기본 설정으로 완전 초기화
     audio_bytes = audio_recorder(
         text="클릭하여 녹음 (시작/중지)", 
         recording_color="#ff4b4b", 
         neutral_color="#808080", 
-        icon_size="2x",
-        pause_threshold=600.0,
-        sample_rate=44100
+        icon_size="2x"
     )
     if audio_bytes:
         file_name = f"recorded_audio_{datetime.datetime.now().strftime('%H%M%S')}.wav"
