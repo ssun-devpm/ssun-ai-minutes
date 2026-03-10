@@ -4,7 +4,7 @@ from google.generativeai.types import RequestOptions
 import tempfile
 import os
 import datetime
-from audio_recorder_streamlit import audio_recorder
+from st_audiorec import st_audiorec
 
 st.set_page_config(page_title="회의록 생성봇 노썬", layout="wide")
 st.title("🎤 끝내주는 노썬 회의록 작성 봇")
@@ -63,27 +63,15 @@ with tab1:
         audio_data_to_process = {"type": "upload", "data": uploaded_file, "ext": uploaded_file.name.split('.')[-1], "name": uploaded_file.name}
 
 with tab2:
-    st.write("마이크 아이콘을 누르면 녹음이 시작되고, 다시 누르면 중지됩니다.")
+    st.write("아래의 'Start Recording' 버튼을 누르면 브라우저 마이크 권한 요청 후 녹음이 시작됩니다.")
     st.info("⚠️ **참고:** PC에 마이크가 아예 연결되어 있지 않거나 브라우저 권한이 차단된 경우, 브라우저 보안 정책상 녹음 자체가 시작되지 않아 아무런 반응이 없거나 빈 파일조차 생성되지 않습니다.")
-    # 녹음 중지 상태는 회색, 녹음 중 상태는 빨간색으로 변경하여 가시성 확보
-    # 오직 색상 파라미터만 남기고 크롬 호환성을 위해 기본 설정으로 완전 초기화
-    audio_bytes = audio_recorder(
-        text="클릭하여 녹음 (시작/중지)", 
-        recording_color="#ff4b4b", 
-        neutral_color="#808080", 
-        icon_size="2x"
-    )
+    
+    # iOS 호환성이 높은 새로운 오디오 위젯 사용
+    audio_bytes = st_audiorec()
+    
     if audio_bytes:
         file_name = f"recorded_audio_{datetime.datetime.now().strftime('%H%M%S')}.wav"
-        st.success("✅ 녹음이 완료되었습니다!")
-        st.audio(audio_bytes, format="audio/wav")
-        # 녹음 완료 후 오디오 원본 다운로드 버튼 제공
-        st.download_button(
-            label="📥 녹음 파일 다운로드",
-            data=audio_bytes,
-            file_name=file_name,
-            mime="audio/wav"
-        )
+        st.success("✅ 녹음 파일 생성 완료! 아래쪽의 요약 버튼을 눌러 회의록을 추출하세요.")
         # 바이너리 바이트 데이터를 전달
         audio_data_to_process = {"type": "record", "data": audio_bytes, "ext": "wav", "name": file_name}
 
@@ -414,11 +402,19 @@ if st.session_state.meeting_minutes:
                                 old_audio = genai.get_file(upload_name)
                                 
                                 qa_prompt = f"""
-당신은 위 회의록의 바탕이 된 원본 오디오에 대해 답변하는 도우미입니다.
+당신은 다음 [회의록 내용]의 원문 오디오를 분석해주는 충실한 비서입니다.
+사용자는 생성된 회의록 내용을 보고 질문을 하고 있습니다.
+
+--- [회의록 내용] ---
+{minute["text"]}
+---------------------
+
 사용자 질문: "{user_q}"
 
-이 대화가 오디오의 '몇 분 몇 초(타임스탬프)' 쯤에서 언급되었는지 반드시 포함하여 답해주세요.
-(예시: "해당 내용은 오디오 약 12분 30초 경에 A참석자가 발언했습니다.")
+[지시사항]
+1. 첨부된 원본 오디오 파일과 위의 [회의록 내용]을 대조하여 사용자의 질문에 정확히 답변하세요.
+2. 질문한 내용이 오디오의 몇 분 몇 초에 등장하는지 찾아 '타임스탬프(MM:SS)'를 반드시 포함해주세요. (예: "약 12분 30초 경에 언급되었습니다.")
+3. **[경고]** 오디오에서 해당 내용의 정확한 타임스탬프를 확신할 수 없거나 아예 언급된 적이 없다면, 절대로 시간을 지어내지(Hallucination) 마십시오. 그럴 경우 "정확한 시간대에 대한 정보가 오디오에 명확히 남아있지 않습니다" 라고 솔직하게 답변하십시오.
 """
                                 qa_response = qa_model.generate_content([qa_prompt, old_audio])
                                 st.session_state[qa_key].append({"q": user_q, "a": qa_response.text})
